@@ -23,10 +23,8 @@ import { CheckCircle, Upload, FileText, X, AlertCircle } from "lucide-react";
 import { jobs } from "@/components/JobsSection";
 
 // URL de la Lambda Function URL
-const LAMBDA_URL = process.env.NEXT_PUBLIC_LAMBDA_URL;
-if (!LAMBDA_URL) {
-  throw new Error("NEXT_PUBLIC_LAMBDA_URL is not set");
-}
+// NOTA: Cambiar cuando se actualice la Lambda
+const LAMBDA_URL = "https://igfq3yygbhn2cqj4maw5kolnx40zehas.lambda-url.us-east-1.on.aws/";
 
 const areas = ["Ventas", "Tecnología", "Marketing", "Diseño", "Administración y Cobranzas", "Legales"];
 
@@ -181,6 +179,8 @@ const FormSection = () => {
     const name = String(formData.get("name") ?? "");
     const email = String(formData.get("email") ?? "");
     const linkedin = String(formData.get("linkedin") ?? "");
+    const website = String(formData.get("website") ?? ""); // Honeypot
+    const message = String(formData.get("message") ?? "");
 
     const newErrors: FormErrors = {};
 
@@ -219,6 +219,8 @@ const FormSection = () => {
         linkedin,
         position: selectedPosition,
         areas: selectedAreas,
+        message,
+        website, // Honeypot - si viene lleno, la Lambda ignora el request
         cv: cvBase64,
         submittedAt: new Date().toISOString(),
       };
@@ -445,10 +447,26 @@ const FormSection = () => {
               ¿Algo más que quieras contarnos? <span className="text-muted-foreground">(opcional)</span>
             </label>
             <Textarea
+              name="message"
               placeholder="Contanos sobre vos, tus intereses, experiencia relevante..."
               className="bg-card min-h-[100px]"
             />
           </div>
+
+          {/* Honeypot - campo oculto (hidden) para detectar bots */}
+          <input
+            type="text"
+            name="website"
+            style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }}
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+          />
+
+          {/* Cloudflare Turnstile (opcional - descomentar cuando tengas la site key) */}
+          {/* 
+          <div className="cf-turnstile" data-sitekey="TU_SITE_KEY"></div> 
+          */}
 
           <p className="text-xs text-muted-foreground">
             <span className="text-accent">*</span> Campos obligatorios.
