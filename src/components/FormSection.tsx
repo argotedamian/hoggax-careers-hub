@@ -23,7 +23,10 @@ import { CheckCircle, Upload, FileText, X, AlertCircle } from "lucide-react";
 import { jobs } from "@/components/JobsSection";
 
 // URL de la Lambda Function URL
-const LAMBDA_URL = "https://igfq3yygbhn2cqj4maw5kolnx40zehas.lambda-url.us-east-1.on.aws/";
+const LAMBDA_URL = process.env.NEXT_PUBLIC_LAMBDA_URL;
+if (!LAMBDA_URL) {
+  throw new Error("NEXT_PUBLIC_LAMBDA_URL is not set");
+}
 
 const areas = ["Ventas", "Tecnología", "Marketing", "Diseño", "Administración y Cobranzas", "Legales"];
 
