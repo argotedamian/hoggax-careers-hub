@@ -22,9 +22,8 @@ import {
 import { CheckCircle, Upload, FileText, X, AlertCircle } from "lucide-react";
 import { jobs } from "@/components/JobsSection";
 
-// URL de la Lambda - Hardcodear hasta que obtengas la Function URL de AWS
-// Reemplazar con tu Lambda Function URL cuando la crees
-const LAMBDA_URL = "https://TU-LAMBDA-FUNCTION-URL.execute-api.us-east-1.amazonaws.com";
+// URL de la Lambda Function URL
+const LAMBDA_URL = "https://igfq3yygbhn2cqj4maw5kolnx40zehas.lambda-url.us-east-1.on.aws/";
 
 const areas = ["Ventas", "Tecnología", "Marketing", "Diseño", "Administración y Cobranzas", "Legales"];
 
