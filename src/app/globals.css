@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&family=Hanken+Grotesk:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 250 100% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 250 100% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 250 100% 12%;
+
+    --primary: 250 100% 12%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 221 89% 97%;
+    --secondary-foreground: 250 100% 12%;
+
+    --muted: 221 89% 97%;
+    --muted-foreground: 250 30% 45%;
+
+    --accent: 344 100% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 221 30% 90%;
+    --input: 221 30% 90%;
+    --ring: 344 100% 60%;
+
+    --radius: 0.75rem;
+
+    --section-alt: 221 89% 97%;
+
+    --green-light: 152 95% 61%;
+    --green-dark: 145 38% 55%;
+    --yellow: 57 100% 76%;
+  }
+
+  .dark {
+    --background: 250 100% 6%;
+    --foreground: 0 0% 95%;
+    --card: 250 60% 10%;
+    --card-foreground: 0 0% 95%;
+    --popover: 250 60% 10%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 344 100% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 250 40% 14%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 250 30% 15%;
+    --muted-foreground: 250 15% 55%;
+    --accent: 344 100% 60%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 250 30% 18%;
+    --input: 250 30% 18%;
+    --ring: 344 100% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .font-display {
+    font-family: "Rethink Sans", system-ui, sans-serif;
+  }
+  .font-body {
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+  }
+}
