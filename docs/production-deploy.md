@@ -3,67 +3,95 @@
 ## URLs
 
 - **Producción**: https://portalempleo.hoggax.com
+- **Bucket S3**: aws1-hoggax-careers-hub (us-east-1)
 - **Staging**: (pending)
+
+## Método de Deploy
+
+| Método | Cuándo usar |
+|--------|-----------|
+| **S3 Static Export** | Sitio estático (este proyecto usa este método) |
+| Docker | Si necesitás API routes dinámicas |
+
+---
 
 ## Requisitos Previos
 
-- [ ] Docker y Docker Compose instalados
-- [ ] Acceso al repositorio
-- [ ] Credenciales de registry (si usa registry privado)
+- [ ] AWS CLI instalado y configurado
+- [ ] Bucket S3 creado y configurado
+- [ ] Permisos IAM con acceso a S3
 
-## Paso 1: Build de Producción
+## Paso 1: Configurar next.config.ts
 
-```bash
-cd hoggax-careers-hub
-make build
+Primero, verificar que `next.config.ts` tenga la config correcta para static export:
+
+```typescript
+// next.config.ts
+const nextConfig = {
+  output: "export",
+  trailingSlash: true,
+  images: {
+    unoptimized: true,
+  },
+};
+
+module.exports = nextConfig;
 ```
 
-Esto genera la imagen Docker `hoggax-careers-hub-prod:latest`.
-
-## Paso 2: Deploy
-
-### Opción A: Docker Compose (local/server)
+## Paso 2: Build de Producción
 
 ```bash
-make prod
+# Genera archivos estáticos en carpeta 'out/'
+npm run build
 ```
 
-### Opción B: Push a Registry + Deploy
+Esto genera la carpeta `out/` con HTML, CSS, JS e imágenes estáticas.
+
+**Nota**: Si tenés API routes, no funcionará en S3 estático. Necesitás usar un servicio externo (Formspree, Resend, etc.) o cambiar a Docker/Lambda.
+
+## Paso 3: Deploy a S3
 
 ```bash
-# Taggear imagen
-docker tag hoggax-careers-hub-prod:latest registry.hoggax.com/hoggax-careers-hub:v1.0.0
-
-# Push al registry
-docker push registry.hoggax.com/hoggax-careers-hub:v1.0.0
-
-# En el server de producción
-docker pull registry.hoggax.com/hoggax-careers-hub:v1.0.0
-docker run -d -p 3000:3000 --name hoggax-careers-hub registry.hoggax.com/hoggax-careers-hub:v1.0.0
+# Subir archivos al bucket S3
+aws s3 sync out/ s3://aws1-hoggax-careers-hub --delete --acl public-read
 ```
 
-## Paso 3: Configuración DNS
+| Flag | Qué hace |
+|------|---------|
+| `sync` | Sube solo archivos distintos (más rápido) |
+| `--delete` | Borra archivos que ya no existen en `out/` |
+| `--acl public-read` | Setea permisos públicos |
+
+## Paso 4: Configurar CloudFront (opcional pero recomienda)
+
+1. Ir a [CloudFront](https://console.aws.amazon.com/cloudfront) > **Create Distribution**
+2. **Origin Domain**: seleccionar el S3 bucket
+3. Origin access: **Legacy access**
+4. Viewer protocol policy: **Redirect HTTP to HTTPS**
+5. Cache policy: **CachingOptimized**
+6. Create
+
+Después de crear, copiar el **Distribution Domain Name** (ej: `d1234567890.cloudfront.net`)
+
+## Paso 5: Configurar DNS
 
 Configurar en Cloudflare:
 
 | Tipo | Nombre | Valor |
 |------|--------|-------|
-| CNAME | portalempleo | @ o tu load balancer |
+| CNAME | portalempleo | d1234567890.cloudfront.net |
 
-## Paso 4: SSL/TLS
+O si usas S3 directo (sin CloudFront):
+
+| Tipo | Nombre | Valor |
+|------|--------|-------|
+| CNAME | portalempleo | aws1-hoggax-careers-hub.s3-website-us-east-1.amazonaws.com |
+
+## Paso 6: SSL/TLS
 
 Cloudflare provee SSL automático. Asegurar que:
 - **SSL/TLS mode**: "Full" o "Flexible"
 - **Always Use HTTPS**: Enabled
-
-## Configuración de Variables de Entorno
-
-Si necesitas variables de entorno customizadas:
-
-```bash
-# En docker-compose.yml o al ejecutar
-docker run -e WEBHOOK_URL="https://..." -e OTRA_VAR="valor" ...
-```
 
 ## Verificación Post-Deploy
 
@@ -78,25 +106,72 @@ curl -s https://portalempleo.hoggax.com | grep -E '<title>|<meta name="descripti
 ## Rollback
 
 ```bash
-# Si algo sale mal
-docker ps -a  # encontrar versión anterior
-docker tag hoggax-careers-hub-prod:v0.9.0 hoggax-careers-hub-prod:latest
-make prod
+# Subir versión anterior desde out/
+aws s3 sync out/ s3://aws1-hoggax-careers-hub --delete --acl public-read
+
+# O si usás GitHub con versiones:
+# git checkout v0.9.0
+# npm run build
+# aws s3 sync out/ s3://aws1-hoggax-careers-hub --delete --acl public-read
 ```
 
 ## Health Check
 
-Endpoint de health: `GET /` (retorna 200 si todo ok)
+- S3 Website Endpoint: `http://aws1-hoggax-careers-hub.s3-website-us-east-1.amazonaws.com`
+- CloudFront: `https://d1234567890.cloudfront.net`
 
 ---
 
 ## Checklist Pre-Deploy
 
-- [ ] Favicon configurado en `src/app/favicon.ico`
-- [ ] Metadata SEO completa en `src/app/layout.tsx`
-- [ ] OG Image en `src/app/opengraph-image.png` (1200x630px) - opcional
-- [ ] Twitter Image en `src/app/twitter-image.png` (1200x630px) - opcional
-- [ ] Build sin errores: `make build`
-- [ ] Tests pasan (si hay)
-- [ ] DNS configurado
+- [ ] Bucket S3 creado en us-east-1
+- [ ] Bucket Policy configurada (permiso público de lectura)
+- [ ] Static website hosting habilitado
+- [ ] next.config.ts con `output: "export"`
+- [ ] Build sin errores: `npm run build`
+- [ ] Carpeta `out/` generada
+- [ ] DNS configurado en Cloudflare
 - [ ] SSL habilitado en Cloudflare
+
+## Deploy Automatizado con GitHub Actions (opcional)
+
+Crear `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy to S3
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build
+        run: npm run build
+        
+      - name: Deploy to S3
+        uses: jakejarvis/s3-sync-action@master
+        with:
+          args: --delete --acl public-read
+        env:
+          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+```
+
+Agregar secrets en GitHub:
+- `AWS_S3_BUCKET`: `aws1-hoggax-careers-hub`
+- `AWS_ACCESS_KEY_ID`: tu access key de IAM
+- `AWS_SECRET_ACCESS_KEY`: tu secret key

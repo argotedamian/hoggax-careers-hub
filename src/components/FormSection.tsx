@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,10 @@ import {
 } from "@/components/ui/select";
 import { CheckCircle, Upload, FileText, X, AlertCircle } from "lucide-react";
 import { jobs } from "@/components/JobsSection";
+
+// URL de la Lambda - Hardcodear hasta que obtengas la Function URL de AWS
+// Reemplazar con tu Lambda Function URL cuando la crees
+const LAMBDA_URL = "https://TU-LAMBDA-FUNCTION-URL.execute-api.us-east-1.amazonaws.com";
 
 const areas = ["Ventas", "Tecnología", "Marketing", "Diseño", "Administración y Cobranzas", "Legales"];
 
@@ -45,27 +49,6 @@ const FormSection = () => {
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // CSRF token
-  const [csrfToken, setCsrfToken] = useState<string>("");
-  const [csrfExpires, setCsrfExpires] = useState<string>("");
-
-  // Fetch CSRF token on mount
-  useEffect(() => {
-    const fetchCsrf = async () => {
-      try {
-        const res = await fetch("/api/applications", { method: "GET" });
-        const data = await res.json();
-        if (data.token && data.expiresAt) {
-          setCsrfToken(data.token);
-          setCsrfExpires(String(data.expiresAt));
-        }
-      } catch (e) {
-        console.error("Failed to fetch CSRF token:", e);
-      }
-    };
-    fetchCsrf();
-  }, []);
 
   const isAreaRequired = !selectedPosition || selectedPosition === "none";
 
@@ -91,16 +74,14 @@ const FormSection = () => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    
+
     if (!selectedFile) return;
 
-    // Validar tipo
     if (selectedFile.type !== "application/pdf") {
       setErrors((prev) => ({ ...prev, cv: "El archivo debe ser PDF" }));
       return;
     }
 
-    // Validar tamaño
     if (selectedFile.size > MAX_FILE_SIZE) {
       setErrors((prev) => ({ ...prev, cv: "El archivo no puede exceder 5MB" }));
       return;
@@ -181,9 +162,18 @@ const FormSection = () => {
     setErrors((prev) => ({ ...prev, ...newErrors }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     const form = e.currentTarget;
     const formData = new FormData(form);
     const name = String(formData.get("name") ?? "");
@@ -192,7 +182,6 @@ const FormSection = () => {
 
     const newErrors: FormErrors = {};
 
-    // Validar todos los campos
     if (!name) newErrors.name = "El nombre es obligatorio";
     else if (!validateName(name)) newErrors.name = "El nombre debe tener al menos 2 caracteres";
 
@@ -211,7 +200,6 @@ const FormSection = () => {
     setErrors(newErrors);
     setTouched({ name: true, email: true, linkedin: true, position: true, areas: true, cv: true });
 
-    // Si hay errores, no enviar
     if (Object.keys(newErrors).length > 0) {
       return;
     }
@@ -219,43 +207,38 @@ const FormSection = () => {
     setIsSubmitting(true);
     setSubmitError(null);
 
-    const outgoing = new FormData();
-    
-    // CSRF token
-    if (csrfToken && csrfExpires) {
-      outgoing.append("csrf_token", csrfToken);
-      outgoing.append("csrf_expires", csrfExpires);
-    }
-    
-    outgoing.append("name", name);
-    outgoing.append("email", email);
-    outgoing.append("linkedin", linkedin);
-    outgoing.append("position", selectedPosition);
-    selectedAreas.forEach((area) => outgoing.append("areas", area));
-    if (file) outgoing.append("cv", file, file.name);
+    try {
+      // Convertir PDF a base64 para enviar a Lambda
+      const cvBase64 = file ? await fileToBase64(file) : "";
 
-    void (async () => {
-      try {
-        const res = await fetch("/api/applications", {
-          method: "POST",
-          body: outgoing,
-        });
+      const payload = {
+        name,
+        email,
+        linkedin,
+        position: selectedPosition,
+        areas: selectedAreas,
+        cv: cvBase64,
+        submittedAt: new Date().toISOString(),
+      };
 
-        if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as
-            | { error?: string }
-            | null;
-          setSubmitError(payload?.error ?? "No se pudo enviar la postulación");
-          return;
-        }
+      const res = await fetch(LAMBDA_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-        setShowThankYou(true);
-      } catch {
-        setSubmitError("No se pudo enviar la postulación");
-      } finally {
-        setIsSubmitting(false);
+      if (!res.ok) {
+        const payloadError = await res.json().catch(() => ({}));
+        setSubmitError(payloadError?.error ?? "No se pudo enviar la postulación");
+        return;
       }
-    })();
+
+      setShowThankYou(true);
+    } catch {
+      setSubmitError("No se pudo enviar la postulación. Verificá la conexión e intentá de nuevo.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -284,10 +267,10 @@ const FormSection = () => {
               <label className="block text-sm font-medium text-foreground mb-2">
                 Nombre y apellido <span className="text-accent">*</span>
               </label>
-              <Input 
+              <Input
                 name="name"
-                placeholder="Tu nombre completo" 
-                required 
+                placeholder="Tu nombre completo"
+                required
                 className={`bg-card h-12 ${errors.name && touched.name ? "border-red-500 focus:border-red-500" : ""}`}
                 onBlur={() => handleBlur("name")}
               />
@@ -301,11 +284,11 @@ const FormSection = () => {
               <label className="block text-sm font-medium text-foreground mb-2">
                 Email <span className="text-accent">*</span>
               </label>
-              <Input 
+              <Input
                 name="email"
-                type="email" 
-                placeholder="tu@email.com" 
-                required 
+                type="email"
+                placeholder="tu@email.com"
+                required
                 className={`bg-card h-12 ${errors.email && touched.email ? "border-red-500 focus:border-red-500" : ""}`}
                 onBlur={() => handleBlur("email")}
               />
@@ -322,10 +305,10 @@ const FormSection = () => {
             <label className="block text-sm font-medium text-foreground mb-2">
               LinkedIn <span className="text-accent">*</span>
             </label>
-            <Input 
+            <Input
               name="linkedin"
-              placeholder="https://linkedin.com/in/tu-perfil" 
-              required 
+              placeholder="https://linkedin.com/in/tu-perfil"
+              required
               className={`bg-card h-12 ${errors.linkedin && touched.linkedin ? "border-red-500 focus:border-red-500" : ""}`}
               onBlur={() => handleBlur("linkedin")}
             />
@@ -402,7 +385,7 @@ const FormSection = () => {
               CV (PDF) <span className="text-accent">*</span>
               <span className="text-muted-foreground font-normal ml-1">- Máx 5MB</span>
             </label>
-            
+
             {!file ? (
               <label
                 className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 cursor-pointer hover:border-accent/40 hover:bg-accent/5 transition-all bg-card"
@@ -459,9 +442,9 @@ const FormSection = () => {
             <label className="block text-sm font-medium text-foreground mb-2">
               ¿Algo más que quieras contarnos? <span className="text-muted-foreground">(opcional)</span>
             </label>
-            <Textarea 
-              placeholder="Contanos sobre vos, tus intereses, experiencia relevante..." 
-              className="bg-card min-h-[100px]" 
+            <Textarea
+              placeholder="Contanos sobre vos, tus intereses, experiencia relevante..."
+              className="bg-card min-h-[100px]"
             />
           </div>
 
@@ -475,10 +458,10 @@ const FormSection = () => {
             </p>
           )}
 
-          <Button 
-            variant="cta" 
-            size="lg" 
-            type="submit" 
+          <Button
+            variant="cta"
+            size="lg"
+            type="submit"
             className="w-full text-base py-6"
             disabled={isSubmitting}
           >
