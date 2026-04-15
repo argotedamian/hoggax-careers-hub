@@ -175,3 +175,59 @@ Agregar secrets en GitHub:
 - `AWS_S3_BUCKET`: `aws1-hoggax-careers-hub`
 - `AWS_ACCESS_KEY_ID`: tu access key de IAM
 - `AWS_SECRET_ACCESS_KEY`: tu secret key
+
+---
+
+## Configurar Formulario (Lambda + n8n)
+
+El formulario de postulaciones usa una Lambda para recibir los datos y enviarse a n8n.
+
+### 1. Crear webhook en n8n
+
+1. Ir a tu n8n > **Workflows** > **New**
+2. Agregar nodo **Webhook** (trigger)
+3. Copiar la URL del webhook
+
+### 2. Crear Lambda en AWS
+
+Ver documento completo: [lambda-form-handler.md](lambda-form-handler.md)
+
+Pasos resumidos:
+
+1. **Lambda** > Create function
+   - Name: `hoggax-form-handler`
+   - Runtime: `Node.js 20.x`
+
+2. **Function URL** > Enable
+   - Auth type: `NONE`
+
+3. Actualizar código con webhook de n8n
+
+### 3. Actualizar FormSection.tsx
+
+En `src/components/FormSection.tsx` línea 26, reemplazar:
+
+```typescript
+// Antes (placeholder):
+const LAMBDA_URL = "https://TU-LAMBDA-FUNCTION-URL.execute-api.us-east-1.amazonaws.com";
+
+// Después (tu URL real):
+const LAMBDA_URL = "https://xxxxx.execute-api.us-east-1.amazonaws.com/2015-03-31/functions/hoggax-form-handler/invocations";
+```
+
+### 4. Rebuild y redeploy
+
+```bash
+npm run build
+aws s3 sync out/ s3://aws1-hoggax-careers-hub --delete --acl public-read
+```
+
+### Checklist Formulario
+
+- [ ] Webhook de n8n creado
+- [ ] Lambda creada con Function URL
+- [ ] Código de Lambda actualizado con webhook URL
+- [ ] FormSection.tsx actualizado con Lambda URL
+- [ ] Build exitoso
+- [ ] Deploy a S3
+- [ ] Probar formulario

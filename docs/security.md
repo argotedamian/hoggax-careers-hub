@@ -1,6 +1,6 @@
 # Medidas de Seguridad - portalempleo.hoggax.com
 
-Documentación de las medidas de seguridad implementadas en el formulario de postulaciones.
+Documentación de las medidas de seguridad implementadas en el sitio estático + Lambda.
 
 ---
 
@@ -8,247 +8,242 @@ Documentación de las medidas de seguridad implementadas en el formulario de pos
 
 | Medida | Estado | Ubicación |
 |--------|--------|-----------|
-| Rate Limiting | ✅ Implementado | `src/lib/rate-limit.ts` |
-| CSRF Protection | ✅ Implementado | `src/app/api/applications/route.ts` |
-| Sanitización de Inputs | ✅ Implementado | `src/lib/sanitize.ts` |
-| Validación de Archivo | ✅ Implementado | `route.ts` |
-| Logging/Auditoría | ✅ Implementado | `route.ts` |
+| S3 Bucket Policy | ✅ Solo lectura pública | AWS Console |
+| HTTPS/TLS | ✅ Cloudflare + CloudFront | DNS |
+| Lambda Function URL | ✅ Sin auth (solo public) | Lambda config |
+| Rate Limiting | ⚠️ En n8n | n8n workflow |
+| Input Validation | ✅ Frontend + Lambda | FormSection.tsx |
+| CV Validation | ✅ Tamaño < 6MB | Lambda |
+| Logging | ✅ CloudWatch | AWS Console |
 
 ---
 
-## 1. Rate Limiting
+## 1. S3 Bucket Policy
 
 ### Propósito
-Prevenir spam, automatización maliciosa, y ataques de fuerza bruta.
+Permitir solo lectura pública de archivos estáticos.
+
+### Configuración
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadGetObject",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::aws1-hoggax-careers-hub/*"
+    }
+  ]
+}
+```
+
+### Qué hace
+- **Permite**:Cualquier persona puede LEER archivos (`GetObject`)
+- **NO permite**: WRITE, DELETE, LIST (solo lectura)
+- Los archivos subidos sondeanónimos, no hay escritura
+
+---
+
+## 2. HTTPS/TLS
+
+### Cloudflare
+- **SSL/TLS mode**: "Full" o "Flexible"
+- **Always Use HTTPS**: Enabled
+
+### CloudFront (opcional)
+- **Viewer Protocol Policy**: Redirect HTTP to HTTPS
+- **Origin Protocol Policy**: HTTPS Only
+
+---
+
+## 3. Lambda Function URL
+
+### Propósito
+Exponer el handler del formulario públicamente.
+
+### Configuración
+- **Auth type**: `NONE` (público, sin API key)
+- **CORS**: Configurado en Lambda
+
+### Seguridad
+- La Lambda está expuesta públicamente por diseño
+- **Protegida por**: n8n webhook (URL secreta)
+- Rate limiting implementado en n8n
+
+### Código de la Lambda
+```javascript
+export const handler = async (event) => {
+  // CORS headers
+  const headers = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
+  // Handle preflight
+  if (event.httpMethod === "OPTIONS") {
+    return { statusCode: 200, headers };
+  }
+
+  // Procesar formulario
+  const body = JSON.parse(event.body);
+  // ... validación y envío a n8n
+};
+```
+
+---
+
+## 4. Rate Limiting (n8n)
+
+### Propósito
+Prevenir spam y abuso del formulario.
 
 ### Implementación
-```typescript
-// src/lib/rate-limit.ts
-const WINDOW_MS = 60 * 1000; // 1 minuto
-const MAX_REQUESTS = 5; // 5 postulaciones por IP por ventana
+En n8n, agregar nodo **IF** antes de procesar:
+
+```
+{{ $json.rateLimitExceeded }}
+  - true → Discard, responder error
+  - false → Procesar
 ```
 
-### Comportamiento
-- **Límite**: 5 requests por IP por minuto
-- **Al exceder**: Retorna `429 Too Many Requests`
-- **Header**: `Retry-After: <segundos>`
+### Configuración en n8n
+1. Agregar nodo **Code** o función
+2. implementar contador de requests por IP
+3. Guardar en Redis/Upstash para persistencia
 
-### Limites
-- In-memory (se resetea al reiniciar el container)
-- Para producción con múltiples instancias: usar Redis/Upstash
+---
 
-### Código relevante
+## 5. Validación de Input
+
+### Frontend (FormSection.tsx)
 ```typescript
-export function checkRateLimit(ip: string) {
-  // Returns: { allowed: boolean, remaining: number, resetIn: number }
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validateLinkedIn = (url: string): boolean => {
+  const linkedInRegex = /^https?:\/\/(www\.)?linkedin\.com\/in\/[a-zA-Z0-9-]+\/?$/;
+  return linkedInRegex.test(url);
+};
+```
+
+### Backend (Lambda)
+```javascript
+const required = ["name", "email", "position"];
+for (const field of required) {
+  if (!body[field]) {
+    return { statusCode: 400, body: JSON.stringify({ error: `Missing: ${field}` }) };
+  }
 }
 ```
 
 ---
 
-## 2. CSRF Protection
-
-### Propósito
-Prevenir ataques de Cross-Site Request Forgery.
-
-### Implementación
-1. **GET `/api/applications`**: Genera un token CSRF
-2. **POST**: Valida el token antes de procesar
-
-### Flujo
-```
-1. Usuario entra a la página
-2. useEffect() llama a GET /api/applications
-3. Servidor retorna: { token: "uuid", expiresAt: 1713123456789 }
-4. Frontend guarda token + expiration
-5. Usuario envía formulario
-6. Frontend envía csrf_token + csrf_expires en el formData
-7. Servidor_valida token antes de procesar
-```
-
-### Validación
-- Token debe existir
-- Token no debe estar vacío
-- Timestamp no debe haber expirado (> Date.now())
-- Retorna 403 si falla
-
-### Código relevante
-```typescript
-// GET - generar token
-export async function GET() {
-  const token = crypto.randomUUID();
-  const expiresAt = Date.now() + 15 * 60 * 1000; // 15 min
-  return json({ token, expiresAt });
-}
-
-// POST - validar
-const csrfToken = asString(incoming.get("csrf_token"));
-const csrfExpires = asString(incoming.get("csrf_expires"));
-if (!csrfToken || !csrfExpires) {
-  return json({ ok: false, error: "Security validation failed" }, { status: 403 });
-}
-if (Date.now() > parseInt(csrfExpires, 10)) {
-  return json({ ok: false, error: "Session expired" }, { status: 403 });
-}
-```
-
----
-
-## 3. Sanitización de Inputs
-
-### Propósito
-Prevenir XSS (Cross-Site Scripting) y inyección de código malicioso.
-
-### Funciones
-```typescript
-// src/lib/sanitize.ts
-
-// Sanitiza nombre - remove caracteres especiales
-sanitizeName(name: string): string
-
-// Sanitiza email - solo caracteres válidos
-sanitizeEmail(email: string): string
-
-// Sanitiza LinkedIn URL
-sanitizeLinkedIn(url: string): string
-
-// Sanitiza área - whitelist
-sanitizeArea(area: string): string
-```
-
-### Ejemplos
-| Input | Output | Notas |
-|-------|--------|-------|
-| `<script>alert(1)</script>` | `` | Removido |
-| `Juan'; DROP TABLE--` | `Juan DROP TABLE` | Limpiado |
-| `test@example.com` | `test@example.com` | Lowercase |
-| `https://evil.com` | `` | No es linkedin.com |
-
----
-
-## 4. Validación de Archivo (CV)
+## 6. Validación de Archivo (CV)
 
 ### Propósitos
 - Prevenir malware
-- Prevenir archivos grandes (DoS)
-- Asegurar formato esperado
+- Prevenir archivos muy grandes (DoS)
+- Asegurar formato PDF
 
-### Validaciones
-- **Tipo MIME**: Solo `application/pdf`
-- **Tamaño**: M��ximo 5MB
-- **Extensión**: No validada (usa MIME type)
-
-### Código
+### Frontend
 ```typescript
-if (cv.type !== "application/pdf") {
-  return json({ error: "CV must be a PDF" }, { status: 400 });
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+if (selectedFile.type !== "application/pdf") {
+  setErrors({ cv: "El archivo debe ser PDF" });
 }
-if (cv.size > MAX_FILE_SIZE) {
-  return json({ error: "CV exceeds 5MB" }, { status: 400 });
+if (selectedFile.size > MAX_FILE_SIZE) {
+  setErrors({ cv: "El archivo no puede exceder 5MB" });
 }
 ```
 
----
-
-## 5. Logging y Auditoría
-
-### Propósito
-Registro de intentos para análisis y respuesta a incidentes.
-
-### Logs generados
-```typescript
-// Rate limit bloqueado
-console.warn(`[RATE-LIMIT] IP blocked: ${clientIp}, retry in ...s`)
-
-// CSRF inválido
-console.warn(`[CSRF] Missing token from ${clientIp}`)
-
-// Validación fallida
-console.warn(`[VALIDATION] Invalid email from ${clientIp}`)
-
-// Aplicación exitosa
-console.log(`[SUBMIT] Application received from ${email} (IP: ${clientIp})`)
-```
-
-### Formato de logs
-```
-[TIMESTAMP] [LEVEL] Message
-[2024-04-14T12:00:00Z] [RATE-LIMIT] IP blocked: 1.2.3.4, retry in 45s
-```
+### Lambda
+- Límite de payload: 6MB (límite de Lambda)
+- Si el CV es mayor, considerar S3 presigned URL
 
 ---
 
-## 6. Encabezados de Seguridad (futuro)
+## 7. Logging y Monitoreo
 
-### Recomendados
-```typescript
-// próximas implementaciones
-- 'X-Content-Type-Options': 'nosniff'
-- 'X-Frame-Options': 'DENY'
-- 'Content-Security-Policy': "..."
+### AWS CloudWatch
+- **Lambda > Monitor > View CloudWatch logs**
+- Logs de cada request:
+  - Body recibido
+  - Errores de validación
+  - Respuesta de n8n
+
+### Logs de ejemplo
+```json
+{
+  "requestId": "abc-123",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "name": "Juan Pérez",
+  "email": "juan@email.com",
+  "status": 200
+}
 ```
+
+### Alertas
+Configurar en CloudWatch:
+- **Errors**: > 0 en 5 minutos
+- **Duration**: > 5000ms
 
 ---
 
-## Configuración de Variables
+## 8. Encabezados de Seguridad
 
-### Desarrollo (.env.local)
+### CloudFront
+En **Response headers policy**:
+
+| Header | Value |
+|--------|-------|
+| X-Content-Type-Options | nosniff |
+| X-Frame-Options | DENY |
+| X-XSS-Protection | 1; mode=block |
+| Referrer-Policy | strict-origin-when-cross-origin |
+| Content-Security-Policy | default-src 'self' |
+
+---
+
+## Variables de Entorno
+
+### Lambda
 ```bash
-WEBHOOK_URL="http://host.docker.internal:5678/webhook/n8n"
+# Requerido
+N8N_WEBHOOK_URL=https://tu-n8n.io/webhook/form
 ```
 
-### Producción
-```bash
-WEBHOOK_URL="https://tu-n8n.com/webhook/..."
+### S3
 ```
-
----
-
-## Tests de Seguridad
-
-### Rate Limiting
-```bash
-# Enviar 6requests en 1 minuto (debe fallar el 6to)
-for i in {1..6}; do
-  curl -X POST "http://localhost:3000/api/applications" \
-    -F "csrf_token=test" -F "csrf_expires=9999999999999" \
-    -F "name=test" -F "email=test$i@test.com" \
-    -F "linkedin=https://linkedin.com/in/test" \
-    -F "position=test" -F "cv=@test.pdf;type=application/pdf"
-done
-# Último debe retornar 429
-```
-
-### CSRF
-```bash
-# Sin token
-curl -X POST "http://localhost:3000/api/applications" -F "name=test"
-# Debe retornar 403
-
-# Con token expirado
-curl -X POST "http://localhost:3000/api/applications" \
-  -F "csrf_token=test" -F "csrf_expires=1" -F "name=test"
-# Debe retornar 403
+# No hay variables de entorno para S3 estático
 ```
 
 ---
 
-## Notas de Producción
+## Checklist de Seguridad
 
-### Rate Limiting
-El rate limiter actual es in-memory:
-- Se resetea al reiniciar el container
-- No shared entre múltiples instancias
-
-**Para producción con múltiples instancias**:
-- Usar Redis: `src/lib/rate-limit-redis.ts` (no implementado)
-- O Upstash: `@upstash/ratelimit`
-
-### Logging
-Los logs van a stdout del container.
-
-### Monitoreo
-- Cloudflare Analytics para requests bloqueados
-- Logs del container para auditoría
+- [ ] Bucket S3 con policy de solo lectura
+- [ ] HTTPS forzado en Cloudflare
+- [ ] CloudFront con headers de seguridad
+- [ ] Lambda con CORS configurado
+- [ ] Rate limiting en n8n
+- [ ] Validación en frontend
+- [ ] Validación en Lambda
+- [ ] Logging en CloudWatch
+- [ ] Alertas configuradas
 
 ---
+
+## Monitoreo
+
+| Métrica |Dónde ver | Alerta |
+|--------|---------|-------|
+| Requests totales | CloudWatch | > 1000/día |
+| Errors | CloudWatch | > 0 |
+| Duration | CloudWatch | > 5s |
+| n8n executions | n8n dashboard | - |
