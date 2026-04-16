@@ -11,7 +11,6 @@
 | Método | Cuándo usar |
 |--------|-----------|
 | **S3 Static Export** | Sitio estático (este proyecto usa este método) |
-| Docker | Si necesitás API routes dinámicas |
 
 ---
 

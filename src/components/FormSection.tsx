@@ -22,9 +22,12 @@ import {
 import { CheckCircle, Upload, FileText, X, AlertCircle } from "lucide-react";
 import { jobs } from "@/components/JobsSection";
 
-// URL de la Lambda Function URL
-// NOTA: Cambiar cuando se actualice la Lambda
-const LAMBDA_URL = "https://igfq3yygbhn2cqj4maw5kolnx40zehas.lambda-url.us-east-1.on.aws/";
+// URL de la API Gateway - configurar en NEXT_PUBLIC_API_URL
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
+if (!API_URL) {
+  console.warn("NEXT_PUBLIC_API_URL no está configurado - el formulario no funcionará");
+}
 
 const areas = ["Ventas", "Tecnología", "Marketing", "Diseño", "Administración y Cobranzas", "Legales"];
 
@@ -225,7 +228,7 @@ const FormSection = () => {
         submittedAt: new Date().toISOString(),
       };
 
-      const res = await fetch(LAMBDA_URL, {
+      const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

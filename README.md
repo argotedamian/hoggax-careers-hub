@@ -6,7 +6,6 @@ Portal de carreras y oportunidades laborales de Hoggax.
 
 - Node.js 18+
 - npm
-- Docker (opcional)
 
 ## Instalación
 
@@ -25,52 +24,18 @@ Abrir [http://localhost:3000](http://localhost:3000)
 ## Variables de entorno
 
 - Crear un `.env.local` usando `.env.local.example`.
-- **`WEBHOOK_URL`**: URL del webhook que recibe el `multipart/form-data` (incluye el PDF).
-
-## Docker (opcional)
-
-### Requisitos
-
-- Docker
-- Docker Compose
-
-### Comandos con Make
-
-```bash
-# Desarrollo con hot reload
-make dev
-
-# Producción
-make prod
-
-# Ver logs
-make logs
-
-# Detener contenedores
-make down
-
-# Destruir todo (contenedores + imágenes + volúmenes)
-make clean
-```
-
-### Comandos Docker directos
-
-```bash
-# Desarrollo
-docker compose up dev
-
-# Producción
-docker compose up --build prod
-
-# Detener
-docker compose down
-```
+- **`NEXT_PUBLIC_API_URL`**: URL del API Gateway para el formulario.
 
 ## Build producción
 
 ```bash
 npm run build
-npm start
+```
+
+## Deploy a S3
+
+```bash
+aws s3 sync out/ s3://aws1-hoggax-careers-hub --delete --acl public-read
 ```
 
 ## Tech Stack
