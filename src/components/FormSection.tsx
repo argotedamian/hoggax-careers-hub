@@ -165,15 +165,6 @@ const FormSection = () => {
     setErrors((prev) => ({ ...prev, ...newErrors }));
   };
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-    });
-  };
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -213,25 +204,22 @@ const FormSection = () => {
     setSubmitError(null);
 
     try {
-      // Convertir PDF a base64 para enviar a Lambda
-      const cvBase64 = file ? await fileToBase64(file) : "";
+      // Usar FormData para enviar el archivo directamente (sin base64)
+      const submitData = new FormData();
+      submitData.append("name", name);
+      submitData.append("email", email);
+      submitData.append("linkedin", linkedin);
+      submitData.append("position", selectedPosition);
+      submitData.append("areas", JSON.stringify(selectedAreas));
+      submitData.append("message", message);
+      submitData.append("website", website); // Honeypot
+      if (file) submitData.append("cv", file);
+      submitData.append("submittedAt", new Date().toISOString());
 
-      const payload = {
-        name,
-        email,
-        linkedin,
-        position: selectedPosition,
-        areas: selectedAreas,
-        message,
-        website, // Honeypot - si viene lleno, la Lambda ignora el request
-        cv: cvBase64,
-        submittedAt: new Date().toISOString(),
-      };
-
+      // No setear Content-Type - el navegador lo hace automáticamente con el boundary
       const res = await fetch(API_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: submitData,
       });
 
       if (!res.ok) {
