@@ -1,5 +1,17 @@
 import type { Metadata, Viewport } from "next";
+import React from "react";
 import "./globals.css";
+
+// ===========================================
+// Favicon para static export
+// ===========================================
+const Favicon = () => (
+  <>
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/favicon.ico" />
+  </>
+);
 
 export const metadata: Metadata = {
   // Basic SEO
@@ -59,11 +71,6 @@ export const metadata: Metadata = {
   // Verificación deOwnership (Google, Bing)
   // googleSiteVerification: "verification-code",
   // bingVerification: "verification-code",
-
-  // Favicon
-  icons: {
-    icon: "/favicon.ico",
-  },
 };
 
 export const viewport: Viewport = {
@@ -78,6 +85,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="h-full antialiased">
+      <head>
+        <Favicon />
+      </head>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>{children}</body>
     </html>
   );

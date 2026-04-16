@@ -228,7 +228,24 @@ const FormSection = () => {
         return;
       }
 
+      // Resetear formulario después del éxito
       setShowThankYou(true);
+      
+      // Limpiar estados
+      setFile(null);
+      setSelectedPosition("");
+      setSelectedAreas([]);
+      setErrors({});
+      setTouched({});
+      setSubmitError(null);
+      
+      // Limpiar el input file del DOM
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      
+      // Limpiar el formulario HTML
+      form.reset();
     } catch {
       setSubmitError("No se pudo enviar la postulación. Verificá la conexión e intentá de nuevo.");
     } finally {
