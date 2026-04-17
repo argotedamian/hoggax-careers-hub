@@ -56,9 +56,7 @@ const FormSection = () => {
   const isAreaRequired = !selectedPosition || selectedPosition === "none";
 
   const toggleArea = (area: string) => {
-    setSelectedAreas((prev) =>
-      prev.includes(area) ? prev.filter((a) => a !== area) : [...prev, area]
-    );
+    setSelectedAreas([area]); // Solo un elemento,替换旧数组
   };
 
   const validateEmail = (email: string): boolean => {
@@ -155,7 +153,7 @@ const FormSection = () => {
     }
 
     if (field === "areas" && touched.areas && isAreaRequired) {
-      if (selectedAreas.length === 0) newErrors.areas = "Seleccioná al menos un área";
+      if (!selectedAreas.length) newErrors.areas = "Seleccioná un área";
     }
 
     if (field === "cv" && touched.cv) {
@@ -189,7 +187,7 @@ const FormSection = () => {
 
     if (!selectedPosition) newErrors.position = "Seleccioná una posición";
 
-    if (isAreaRequired && selectedAreas.length === 0) newErrors.areas = "Seleccioná al menos un área de interés";
+    if (isAreaRequired && !selectedAreas.length) newErrors.areas = "Seleccioná al menos un área de interés";
 
     if (!file) newErrors.cv = "El CV es obligatorio";
 
@@ -375,7 +373,7 @@ const FormSection = () => {
                     setTouched((prev) => ({ ...prev, areas: true }));
                   }}
                   className={`px-3 py-2 rounded-full text-sm font-medium border transition-all duration-200 ${
-                    selectedAreas.includes(area)
+                    selectedAreas[0] === area
                       ? "bg-accent text-accent-foreground border-accent"
                       : "bg-card text-muted-foreground border-border hover:border-accent/40"
                   }`}
