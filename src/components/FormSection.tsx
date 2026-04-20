@@ -136,28 +136,34 @@ const FormSection = () => {
     if (field === "name" && touched.name) {
       if (!name) newErrors.name = "El nombre es obligatorio";
       else if (!validateName(name)) newErrors.name = "El nombre debe tener al menos 2 caracteres";
+      else newErrors.name = undefined;
     }
 
     if (field === "email" && touched.email) {
       if (!email) newErrors.email = "El email es obligatorio";
       else if (!validateEmail(email)) newErrors.email = "Ingresa un email válido";
+      else newErrors.email = undefined;
     }
 
     if (field === "linkedin" && touched.linkedin) {
       if (!linkedin) newErrors.linkedin = "La URL de LinkedIn es obligatoria";
       else if (!validateLinkedIn(linkedin)) newErrors.linkedin = "Ingresa una URL válida de LinkedIn";
+      else newErrors.linkedin = undefined;
     }
 
     if (field === "position" && touched.position) {
       if (!selectedPosition) newErrors.position = "Seleccioná una posición";
+      else newErrors.position = undefined;
     }
 
-    if (field === "areas" && touched.areas && isAreaRequired) {
-      if (!selectedAreas.length) newErrors.areas = "Seleccioná un área";
+    if (field === "areas" && touched.areas) {
+      if (isAreaRequired && !selectedAreas.length) newErrors.areas = "Seleccioná un área";
+      else newErrors.areas = undefined;
     }
 
     if (field === "cv" && touched.cv) {
       if (!file) newErrors.cv = "El CV es obligatorio";
+      else newErrors.cv = undefined;
     }
 
     setErrors((prev) => ({ ...prev, ...newErrors }));
@@ -283,6 +289,7 @@ const FormSection = () => {
                 required
                 className={`bg-card h-12 ${errors.name && touched.name ? "border-red-500 focus:border-red-500" : ""}`}
                 onBlur={() => handleBlur("name")}
+                onChange={() => touched.name && validateField("name")}
               />
               {errors.name && touched.name && (
                 <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
@@ -301,6 +308,7 @@ const FormSection = () => {
                 required
                 className={`bg-card h-12 ${errors.email && touched.email ? "border-red-500 focus:border-red-500" : ""}`}
                 onBlur={() => handleBlur("email")}
+                onChange={() => touched.email && validateField("email")}
               />
               {errors.email && touched.email && (
                 <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
@@ -321,6 +329,7 @@ const FormSection = () => {
               required
               className={`bg-card h-12 ${errors.linkedin && touched.linkedin ? "border-red-500 focus:border-red-500" : ""}`}
               onBlur={() => handleBlur("linkedin")}
+              onChange={() => touched.linkedin && validateField("linkedin")}
             />
             {errors.linkedin && touched.linkedin && (
               <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
