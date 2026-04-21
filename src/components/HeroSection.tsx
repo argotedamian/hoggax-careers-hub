@@ -24,6 +24,14 @@ const HeroSection = () => {
         <div className="absolute inset-0 bg-gradient-to-t from-[#0B003B]/50 to-transparent" />
       </div>
 
+      <div className="container absolute top-16 left-0 right-0 z-20 flex justify-end pointer-events-none">
+        <img
+          src="/gptw-badge-hero.png"
+          alt="Great Place to Work Certificada - Argentina Jun 2025-Jun 2026"
+          className="h-28 md:h-36 lg:h-44 w-auto drop-shadow-xl"
+        />
+      </div>
+
       <div className="container relative z-10 pt-24 pb-16">
         <div className="max-w-2xl">
           <motion.h1

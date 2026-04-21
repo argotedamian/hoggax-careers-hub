@@ -13,8 +13,8 @@ const steps = [
   },
   {
     num: "02",
-    title: "Primera entrevista",
-    desc: "Un espacio para conocernos y profundizar en tu recorrido.",
+    title: "Evaluación del perfil",
+    desc: "Un formulario online y dos entrevistas para conocernos y profundizar en tu recorrido.",
     icon: Users,
   },
   {

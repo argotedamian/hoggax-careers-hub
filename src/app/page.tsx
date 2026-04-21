@@ -5,6 +5,7 @@ import CultureSection from "@/components/CultureSection";
 import TeamsSection from "@/components/TeamsSection";
 import ProcessSection from "@/components/ProcessSection";
 import BenefitsSection from "@/components/BenefitsSection";
+import GptwBanner from "@/components/GptwBanner";
 import FormSection from "@/components/FormSection";
 import FaqSection from "@/components/FaqSection";
 import Footer from "@/components/Footer";
@@ -17,6 +18,7 @@ export default function Home() {
       <HeroSection />
       <JobsSection />
       <CultureSection />
+      <GptwBanner />
       <TeamsSection />
       <ProcessSection />
       <BenefitsSection />

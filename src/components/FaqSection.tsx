@@ -1,7 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 
 const faqs = [
@@ -13,7 +13,7 @@ const faqs = [
 
 const FaqItem = ({ question, answer }: { question: string; answer: string }) => {
   const [isOpen, setIsOpen] = useState(false);
-  
+
   return (
     <div className="border border-border rounded-lg px-5 bg-card overflow-hidden">
       <button
@@ -21,13 +21,29 @@ const FaqItem = ({ question, answer }: { question: string; answer: string }) => 
         className="flex items-center justify-between w-full py-4 text-left font-medium text-foreground"
       >
         <span>{question}</span>
-        <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        <motion.span
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className="shrink-0 ml-4"
+        >
+          <ChevronDown className="w-4 h-4" />
+        </motion.span>
       </button>
-      {isOpen && (
-        <div className="pb-4 text-muted-foreground leading-relaxed">
-          {answer}
-        </div>
-      )}
+
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <p className="pb-4 text-muted-foreground leading-relaxed">{answer}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
