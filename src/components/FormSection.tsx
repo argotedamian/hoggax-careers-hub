@@ -64,11 +64,6 @@ const FormSection = () => {
     return emailRegex.test(email);
   };
 
-  const validateLinkedIn = (url: string): boolean => {
-    const linkedInRegex = /^https?:\/\/(www\.)?linkedin\.com\/in\/[a-zA-Z0-9-]+\/?$/;
-    return linkedInRegex.test(url);
-  };
-
   const validateName = (name: string): boolean => {
     return name.trim().length >= 2;
   };
@@ -145,12 +140,6 @@ const FormSection = () => {
       else newErrors.email = undefined;
     }
 
-    if (field === "linkedin" && touched.linkedin) {
-      if (!linkedin) newErrors.linkedin = "La URL de LinkedIn es obligatoria";
-      else if (!validateLinkedIn(linkedin)) newErrors.linkedin = "Ingresa una URL válida de LinkedIn";
-      else newErrors.linkedin = undefined;
-    }
-
     if (field === "position" && touched.position) {
       if (!selectedPosition) newErrors.position = "Seleccioná una posición";
       else newErrors.position = undefined;
@@ -188,9 +177,6 @@ const FormSection = () => {
     if (!email) newErrors.email = "El email es obligatorio";
     else if (!validateEmail(email)) newErrors.email = "Ingresa un email válido";
 
-    if (!linkedin) newErrors.linkedin = "La URL de LinkedIn es obligatoria";
-    else if (!validateLinkedIn(linkedin)) newErrors.linkedin = "Ingresa una URL válida de LinkedIn";
-
     if (!selectedPosition) newErrors.position = "Seleccioná una posición";
 
     if (isAreaRequired && !selectedAreas.length) newErrors.areas = "Seleccioná al menos un área de interés";
@@ -198,7 +184,7 @@ const FormSection = () => {
     if (!file) newErrors.cv = "El CV es obligatorio";
 
     setErrors(newErrors);
-    setTouched({ name: true, email: true, linkedin: true, position: true, areas: true, cv: true });
+    setTouched({ name: true, email: true, position: true, areas: true, cv: true });
 
     if (Object.keys(newErrors).length > 0) {
       return;
@@ -321,21 +307,13 @@ const FormSection = () => {
           {/* LinkedIn */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              LinkedIn <span className="text-accent">*</span>
+              LinkedIn <span className="text-muted-foreground font-normal">(opcional)</span>
             </label>
             <Input
               name="linkedin"
-              placeholder="https://linkedin.com/in/tu-perfil"
-              required
-              className={`bg-card h-12 ${errors.linkedin && touched.linkedin ? "border-red-500 focus:border-red-500" : ""}`}
-              onBlur={() => handleBlur("linkedin")}
-              onChange={() => touched.linkedin && validateField("linkedin")}
+              placeholder="Tu perfil de LinkedIn o cualquier otra referencia"
+              className="bg-card h-12"
             />
-            {errors.linkedin && touched.linkedin && (
-              <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> {errors.linkedin}
-              </p>
-            )}
           </div>
 
           {/* Posición */}
